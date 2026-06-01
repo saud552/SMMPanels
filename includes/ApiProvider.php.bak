@@ -1,0 +1,242 @@
+<?php
+// =============================================
+// includes/ApiProvider.php - كلاس عام للتعامل مع مزودي API
+// =============================================
+
+class ApiProvider {
+    private $api_url;
+    private $api_key;
+    private $provider_id;
+    private $provider_name;
+
+    public function __construct($provider_id, $api_url, $api_key, $provider_name = '') {
+        $this->provider_id = $provider_id;
+        $this->api_url = rtrim($api_url, '/');
+        $this->api_key = $api_key;
+        $this->provider_name = $provider_name;
+    }
+
+    /**
+     * إنشاء طلب جديد
+     */
+    public function createOrder($service_id, $link, $quantity) {
+        $post = [
+            'key' => $this->api_key,
+            'action' => 'add',
+            'service' => $service_id,
+            'link' => $link,
+            'quantity' => $quantity
+        ];
+
+        $response = $this->connect($post);
+
+        if ($response && isset($response->order)) {
+            return [
+                'success' => true,
+                'order_id' => $response->order,
+                'response' => $response
+            ];
+        }
+
+        return [
+            'success' => false,
+            'error' => $response->error ?? 'Unknown error',
+            'response' => $response
+        ];
+    }
+
+    /**
+     * جلب حالة طلب
+     */
+    public function getOrderStatus($order_id) {
+        $post = [
+            'key' => $this->api_key,
+            'action' => 'status',
+            'order' => $order_id
+        ];
+
+        $response = $this->connect($post);
+
+        if ($response && isset($response->status)) {
+            return [
+                'success' => true,
+                'status' => $this->mapStatus($response->status),
+                'start_count' => $response->start_count ?? 0,
+                'remains' => $response->remains ?? 0,
+                'response' => $response
+            ];
+        }
+
+        return [
+            'success' => false,
+            'error' => $response->error ?? 'Unknown error',
+            'response' => $response
+        ];
+    }
+
+    /**
+     * جلب قائمة الخدمات من API
+     */
+    public function getServices() {
+        $post = [
+            'key' => $this->api_key,
+            'action' => 'services'
+        ];
+
+        $response = $this->connect($post);
+
+        if ($response && is_array($response)) {
+            $services = [];
+            foreach ($response as $service) {
+                $services[] = [
+                    'api_service_id' => $service->service,
+                    'name' => $service->name,
+                    'min' => $service->min,
+                    'max' => $service->max,
+                    'price_per_1000' => $service->rate / 1000,
+                    'status' => $service->status == 'active' ? 'active' : 'inactive'
+                ];
+            }
+            return ['success' => true, 'services' => $services];
+        }
+
+        return ['success' => false, 'error' => 'Invalid response from API'];
+    }
+
+    /**
+     * جلب الرصيد من API
+     */
+    public function getBalance() {
+        $post = [
+            'key' => $this->api_key,
+            'action' => 'balance'
+        ];
+
+        $response = $this->connect($post);
+
+        if ($response && isset($response->balance)) {
+            return ['success' => true, 'balance' => $response->balance];
+        }
+
+        return ['success' => false, 'error' => $response->error ?? 'Unknown error'];
+    }
+
+    /**
+     * إعادة تعبئة طلب
+     */
+    public function refillOrder($order_id) {
+        $post = [
+            'key' => $this->api_key,
+            'action' => 'refill',
+            'order' => $order_id
+        ];
+
+        $response = $this->connect($post);
+
+        if ($response && isset($response->refill)) {
+            return ['success' => true, 'refill_id' => $response->refill];
+        }
+
+        return ['success' => false, 'error' => $response->error ?? 'Unknown error'];
+    }
+
+    /**
+     * إلغاء طلب
+     */
+    public function cancelOrder($order_id) {
+        $post = [
+            'key' => $this->api_key,
+            'action' => 'cancel',
+            'order' => $order_id
+        ];
+
+        $response = $this->connect($post);
+
+        if ($response && isset($response->order) && $response->order == $order_id) {
+            return ['success' => true];
+        }
+
+        return ['success' => false, 'error' => $response->error ?? 'Unknown error'];
+    }
+
+    /**
+     * تحويل حالة API إلى الحالة الداخلية
+     */
+    private function mapStatus($api_status) {
+        $status_map = [
+            'pending' => 'pending',
+            'processing' => 'processing',
+            'inprogress' => 'in_progress',
+            'completed' => 'completed',
+            'partial' => 'partial',
+            'canceled' => 'canceled',
+            'cancelled' => 'canceled'
+        ];
+        return $status_map[strtolower($api_status)] ?? 'pending';
+    }
+
+    /**
+     * الاتصال بـ API
+     */
+    private function connect($post) {
+        $_post = [];
+        if (is_array($post)) {
+            foreach ($post as $name => $value) {
+                $_post[] = $name . '=' . urlencode($value);
+            }
+        }
+
+        $ch = curl_init($this->api_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+
+        if (is_array($post)) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, join('&', $_post));
+        }
+
+        curl_setopt($ch, CURLOPT_USERAGENT, 'SkyLink SMM Panel/1.0');
+        $result = curl_exec($ch);
+
+        if (curl_errno($ch) != 0) {
+            curl_close($ch);
+            return false;
+        }
+
+        curl_close($ch);
+        return json_decode($result);
+    }
+}
+
+/**
+ * دالة مساعدة لجلب مزود API حسب الخدمة
+ */
+function getProviderForService($pdo, $service_id) {
+    $stmt = $pdo->prepare("
+        SELECT s.provider_id, s.api_service_id, p.api_url, p.api_key, p.name
+        FROM services s
+        LEFT JOIN api_providers p ON s.provider_id = p.id
+        WHERE s.id = ? AND p.status = 'active'
+    ");
+    $stmt->execute([$service_id]);
+    $provider_data = $stmt->fetch();
+
+    if (!$provider_data) {
+        return null;
+    }
+
+    return [
+        'provider' => new ApiProvider(
+            $provider_data['provider_id'],
+            $provider_data['api_url'],
+            $provider_data['api_key'],
+            $provider_data['name']
+        ),
+        'api_service_id' => $provider_data['api_service_id']
+    ];
+}
+?>
