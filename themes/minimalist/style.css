@@ -1,0 +1,63 @@
+:root {
+    --primary: #000000;
+    --bg-body: #ffffff;
+    --text-main: #111111;
+    --text-muted: #888888;
+    --spacing: 60px;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg-body);
+    color: var(--text-main);
+    margin: 0;
+    line-height: 1.6;
+}
+
+.minimalist-layout {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: var(--spacing) 20px;
+}
+
+.minimal-header {
+    margin-bottom: 100px;
+    text-align: center;
+}
+
+.card {
+    border: none;
+    border-bottom: 1px solid #eeeeee;
+    padding: 40px 0;
+    margin-bottom: 0;
+    border-radius: 0;
+}
+
+.card:last-child {
+    border-bottom: none;
+}
+
+.btn-primary {
+    background: black;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.theme-minimalist h1 {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5rem;
+    text-align: center;
+    margin-bottom: 100px;
+    font-weight: 300;
+}
+
+.theme-minimalist .card h2, .theme-minimalist .card h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 30px;
+}

@@ -1,0 +1,74 @@
+:root {
+    --primary: #ec4899;
+    --secondary: #8b5cf6;
+    --bg-body: #0f172a;
+    --card-bg: #1e293b;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent: #22d3ee;
+}
+
+body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg-body);
+    color: var(--text-main);
+    margin: 0;
+    overflow-x: hidden;
+}
+
+.dark-asymmetric-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    min-height: 100vh;
+}
+
+.asymmetric-header {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    padding: 40px 20px;
+    clip-path: polygon(0 0, 100% 0, 85% 100%, 0% 100%);
+    z-index: 10;
+}
+
+.main-content {
+    padding: 60px;
+    position: relative;
+}
+
+.card {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 4px;
+    border-left: 5px solid var(--accent);
+    transform: rotate(-1deg);
+    transition: transform 0.3s;
+    margin-bottom: 30px;
+}
+
+.card:nth-child(even) {
+    transform: rotate(1deg);
+}
+
+.card:hover {
+    transform: rotate(0deg) scale(1.01);
+}
+.theme-dark-asymmetric h1 {
+    font-size: 5rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    -webkit-text-stroke: 1px var(--primary);
+    color: transparent;
+    margin-bottom: -20px;
+    position: relative;
+    z-index: 2;
+}
+
+.theme-dark-asymmetric .card::after {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: -10px;
+    bottom: -10px;
+    border: 2px solid var(--secondary);
+    z-index: -1;
+}
