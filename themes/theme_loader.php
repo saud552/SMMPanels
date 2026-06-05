@@ -1,9 +1,10 @@
 <?php
-// Theme Loader Helper - Version 2.1 (Defensive & Robust)
+// Theme Loader Helper - Version 2.2 (Fully Synchronized with database.sql)
 require_once __DIR__ . '/../config.php';
 
 /**
- * Robustly fetch theme settings with safe defaults.
+ * Fetches theme settings from the database.
+ * Matches schema defined in database.sql
  */
 function getThemeSettings($pdo) {
     $default_settings = [
@@ -15,39 +16,34 @@ function getThemeSettings($pdo) {
     ];
 
     try {
-        // Safe check for table existence before querying
-        $stmt = $pdo->query("SHOW TABLES LIKE 'theme_settings'");
-        if ($stmt->rowCount() == 0) {
-            return $default_settings;
-        }
-
-        $stmt = $pdo->query("SELECT * FROM theme_settings WHERE id = 1");
+        // Query the theme_settings table (Matches database.sql)
+        $stmt = $pdo->query("SELECT * FROM `theme_settings` WHERE `id` = 1");
         $settings = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$settings || !is_array($settings)) {
             return $default_settings;
         }
 
-        // Merge with defaults to handle missing columns
+        // Return merged settings to ensure all keys exist
         return array_merge($default_settings, $settings);
 
     } catch (Throwable $e) {
-        error_log("Theme System Error: " . $e->getMessage());
+        // Fallback to default if table or columns are missing
+        error_log("Theme Loader Error: " . $e->getMessage());
         return $default_settings;
     }
 }
 
 /**
- * Renders a theme partial with guaranteed fallback.
+ * Renders a theme partial (header, footer, layout, etc.)
  */
 function renderThemePart($part, $pdo, $data = []) {
     $theme_settings = getThemeSettings($pdo);
     $active_theme = $theme_settings['active_theme'] ?? 'classic';
 
-    // Safety check for active_theme value
     if (empty($active_theme)) $active_theme = 'classic';
 
-    // Extract data for use in templates
+    // Extract data for local use in template files
     if (is_array($data)) {
         extract($data);
     }
@@ -59,19 +55,6 @@ function renderThemePart($part, $pdo, $data = []) {
         include $theme_path;
     } elseif (file_exists($fallback_path)) {
         include $fallback_path;
-    } else {
-        error_log("Theme Error: Missing partial [$part] in both active and fallback themes.");
     }
-}
-
-/**
- * Returns a theme asset path safely.
- */
-function getThemeAsset($pdo, $asset) {
-    $theme_settings = getThemeSettings($pdo);
-    $active_theme = $theme_settings['active_theme'] ?? 'classic';
-    if (empty($active_theme)) $active_theme = 'classic';
-
-    return "themes/{$active_theme}/{$asset}";
 }
 ?>
