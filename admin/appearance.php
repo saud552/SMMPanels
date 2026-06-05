@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once '../config.php';
+require_once '../db_updater.php'; // Include the updater for safe execution
 
 // Check login
 if (!isset($_SESSION['admin_id'])) {
@@ -13,24 +14,10 @@ $stmt = $pdo->prepare('SELECT * FROM admin_users WHERE id = ?');
 $stmt->execute([$admin_id]);
 $admin = $stmt->fetch();
 
-// Ensure table exists
-$pdo->exec('CREATE TABLE IF NOT EXISTS theme_settings (
-    id INT(11) NOT NULL AUTO_INCREMENT,
-    active_theme VARCHAR(100) NOT NULL DEFAULT "classic",
-    primary_color VARCHAR(20) DEFAULT "#4f46e5",
-    secondary_color VARCHAR(20) DEFAULT "#ec4899",
-    dark_mode TINYINT(1) DEFAULT 0,
-    custom_css TEXT,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+// Ensure database is aligned before any operation
+updateDatabase($pdo);
 
-$stmt = $pdo->query('SELECT COUNT(*) FROM theme_settings');
-if ($stmt->fetchColumn() == 0) {
-    $pdo->prepare('INSERT INTO theme_settings (active_theme) VALUES (?)')->execute(['classic']);
-}
-
-$stmt = $pdo->query('SELECT * FROM theme_settings LIMIT 1');
+$stmt = $pdo->query('SELECT * FROM theme_settings WHERE id = 1');
 $theme_settings = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $available_themes = [
@@ -44,10 +31,17 @@ $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['activate_theme'])) {
         $active_theme = $_POST['activate_theme'];
-        $stmt = $pdo->prepare('UPDATE theme_settings SET active_theme = ? WHERE id = 1');
-        $stmt->execute([$active_theme]);
-        $message = 'Theme activated successfully!';
-        $theme_settings['active_theme'] = $active_theme;
+
+        // Validate theme id
+        $theme_ids = array_column($available_themes, 'id');
+        if (in_array($active_theme, $theme_ids)) {
+            $stmt = $pdo->prepare('UPDATE theme_settings SET active_theme = ? WHERE id = 1');
+            $stmt->execute([$active_theme]);
+            $message = 'Theme activated successfully!';
+            $theme_settings['active_theme'] = $active_theme;
+        } else {
+            $message = 'Error: Invalid theme selection.';
+        }
     }
 }
 ?>
@@ -55,40 +49,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang='en'>
 <head>
     <meta charset='UTF-8'>
-    <title>Appearance Architecture</title>
+    <title>Theme Management Architecture</title>
     <link rel='stylesheet' href='assets/admin-style.css'>
     <style>
-        .themes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; padding: 20px; }
-        .theme-card { background: white; border-radius: 12px; overflow: hidden; border: 2px solid transparent; transition: 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .theme-card.active { border-color: #4f46e5; }
-        .theme-preview { height: 100px; }
-        .theme-info { padding: 15px; }
-        .theme-name { font-weight: bold; margin-bottom: 5px; }
-        .theme-description { font-size: 12px; color: #666; margin-bottom: 15px; }
-        .btn { cursor: pointer; padding: 8px 16px; border-radius: 6px; border: none; width: 100%; }
+        .themes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; padding: 20px; }
+        .theme-card { background: white; border-radius: 16px; overflow: hidden; border: 3px solid transparent; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .theme-card.active { border-color: #4f46e5; transform: translateY(-5px); box-shadow: 0 15px 30px rgba(79,70,229,0.15); }
+        .theme-preview { height: 140px; display: flex; align-items: center; justify-content: center; font-size: 50px; color: rgba(255,255,255,0.8); }
+        .theme-info { padding: 20px; }
+        .theme-name { font-weight: 800; font-size: 18px; margin-bottom: 8px; color: #1e293b; }
+        .theme-description { font-size: 13px; color: #64748b; margin-bottom: 20px; line-height: 1.6; }
+        .btn { cursor: pointer; padding: 12px 20px; border-radius: 10px; border: none; width: 100%; font-weight: 700; transition: 0.2s; }
         .btn-primary { background: #4f46e5; color: white; }
-        .btn-success { background: #10b981; color: white; }
+        .btn-primary:hover { background: #4338ca; }
+        .btn-success { background: #10b981; color: white; cursor: default; }
     </style>
 </head>
 <body>
     <div style='display:flex;'>
         <?php include 'includes/sidebar.php'; ?>
-        <div style='flex:1; padding: 20px;'>
-            <h1>Theme Management</h1>
-            <?php if ($message): ?><div style='padding:10px; background:#dcfce7; color:#166534; margin-bottom:20px;'><?php echo $message; ?></div><?php endif; ?>
+        <div style='flex:1; padding: 40px; background: #f8fafc; min-height: 100vh;'>
+            <h1 style='font-size: 28px; font-weight: 800; color: #0f172a; margin-bottom: 10px;'>Theme Architecture</h1>
+            <p style='color: #64748b; margin-bottom: 40px;'>Select a global layout architecture for your SMM Panel.</p>
+
+            <?php if ($message): ?>
+                <div style='padding:15px 20px; border-radius: 12px; background:#dcfce7; color:#166534; margin-bottom:30px; font-weight: 600; border-left: 5px solid #22c55e;'>
+                    <i class='fas fa-check-circle'></i> <?php echo $message; ?>
+                </div>
+            <?php endif; ?>
+
             <div class='themes-grid'>
                 <?php foreach ($available_themes as $theme): ?>
-                <div class='theme-card <?php echo ($theme['id'] == $theme_settings['active_theme']) ? "active" : ""; ?>'>
-                    <div class='theme-preview' style='background: <?php echo $theme['preview_color']; ?>'></div>
+                <div class='theme-card <?php echo ($theme['id'] == ($theme_settings['active_theme'] ?? "")) ? "active" : ""; ?>'>
+                    <div class='theme-preview' style='background: <?php echo $theme['preview_color']; ?>'>
+                        <i class='fas fa-swatchbook'></i>
+                    </div>
                     <div class='theme-info'>
                         <div class='theme-name'><?php echo $theme['name']; ?></div>
                         <div class='theme-description'><?php echo $theme['description']; ?></div>
-                        <?php if ($theme['id'] == $theme_settings['active_theme']): ?>
-                            <button class='btn btn-success' disabled>Active</button>
+                        <?php if ($theme['id'] == ($theme_settings['active_theme'] ?? "")): ?>
+                            <button class='btn btn-success'><i class='fas fa-check-circle'></i> Active Architecture</button>
                         <?php else: ?>
                             <form method='POST'>
                                 <input type='hidden' name='activate_theme' value='<?php echo $theme['id']; ?>'>
-                                <button type='submit' class='btn btn-primary'>Activate</button>
+                                <button type='submit' class='btn btn-primary'>Activate Layout</button>
                             </form>
                         <?php endif; ?>
                     </div>
